@@ -205,7 +205,7 @@ inline void getPars(int argc, char *argv[])
 
 	header_prefix = ">";
 
-	if (rsf.find("fq") != -1 || rsf.find("fastaq") != -1)
+	if (rsf.find(".fq") != -1 || rsf.find("fastaq") != -1 || rsf.find("fastq") != -1)
 	{
 		header_prefix = "@";
 	}
