@@ -28,6 +28,7 @@ bool isPE = false;
 bool iskf;
 int *avgQual;
 string rf1, rf2, rsf, kf, logpath;
+string header_prefix;
 
 const size_t BUFFER_SIZE = 1ULL << 25;
 
@@ -155,7 +156,6 @@ inline void getPars(int argc, char *argv[])
 		}
 	}
 
-
 	if (!is1 || !is2)
 	{
 		// fprintf(stderr, "Required parameters are not provided!!\n\n");
@@ -197,9 +197,17 @@ inline void getPars(int argc, char *argv[])
 		}
 		f.close();
 	}
-	
-	if (logpath.length() == 0) {
+
+	if (logpath.length() == 0)
+	{
 		logpath = "output.log";
+	}
+
+	header_prefix = ">";
+
+	if (rsf.find("fq") != -1 || rsf.find("fastaq") != -1)
+	{
+		header_prefix = "@";
 	}
 
 	/*std::ofstream fo;
@@ -1505,15 +1513,18 @@ inline void removeLongDuplicate()
 	// cout << "--------------\n";
 }
 
-int max_strlen() {
+int maxStrlen()
+{
 	int supposed_max = 0;
 	int curr_len = 0;
 
-	for (int rid = 0; rid < max_rid; rid++) {
+	for (int rid = 0; rid < max_rid; rid++)
+	{
 		curr_len = strlen(seq1[rid].seq);
-		if (curr_len > supposed_max) {
-			supposed_max = curr_len; 
-		} 
+		if (curr_len > supposed_max)
+		{
+			supposed_max = curr_len;
+		}
 	}
 
 	return supposed_max;
@@ -1543,7 +1554,9 @@ int main(int argc, char *argv[])
 			return 0;
 		}
 	}
-	L = max_strlen();
+
+	L = maxStrlen();
+
 	if (iskf)
 	{
 		kmervecsize = 0;
@@ -1840,7 +1853,7 @@ int main(int argc, char *argv[])
 			{
 				// using a buffer to speed
 				// fprintf(fp, "%s\n%s\n", seq[rid].name, seq[rid].seq);
-				buf.append(">" + string(seq[rid].name) + "\n" + string(seq[rid].seq) + "\n");
+				buf.append(header_prefix + string(seq[rid].name) + "\n" + string(seq[rid].seq) + "\n");
 				if (seq[rid].qual != NULL)
 				{
 					// fprintf(fp, "+\n%s\n", seq[rid].qual);
@@ -1854,14 +1867,15 @@ int main(int argc, char *argv[])
 			}
 
 			curr_parent = indexremove[rid];
-			if (curr_parent != -1) {
-				if (parents_buffer[curr_parent].length() == 0) {
-					parents_buffer[curr_parent].append(">" + string(seq[curr_parent].name) + ".\n" + string(seq[curr_parent].seq) + "\n");
+			if (curr_parent != -1)
+			{
+				if (parents_buffer[curr_parent].length() == 0)
+				{
+					parents_buffer[curr_parent].append(header_prefix + string(seq[curr_parent].name) + ".\n" + string(seq[curr_parent].seq) + "\n");
 				}
 
-				parents_buffer[curr_parent].append(">" + string(seq[rid].name) + "\n" + string(seq[rid].seq) + "\n");
+				parents_buffer[curr_parent].append(header_prefix + string(seq[rid].name) + "\n" + string(seq[rid].seq) + "\n");
 			}
-			
 		}
 		if (buf.size() > 0)
 		{
@@ -1894,8 +1908,8 @@ int main(int argc, char *argv[])
 			// kseq_destroy
 			if (!isremove[rid])
 			{
-				buf0.append(">" + string(seq1[rid].name) + "\n" + string(seq1[rid].seq) + "\n");
-				buf1.append(">" + string(seq2[rid].name) + "\n" + string(seq2[rid].seq) + "\n");
+				buf0.append(header_prefix + string(seq1[rid].name) + "\n" + string(seq1[rid].seq) + "\n");
+				buf1.append(header_prefix + string(seq2[rid].name) + "\n" + string(seq2[rid].seq) + "\n");
 				// fprintf(fp1, "%s\n%s\n", seq1[rid].name, seq1[rid].seq);
 				// fprintf(fp2, "%s\n%s\n", seq2[rid].name, seq2[rid].seq);
 				if (seq1[rid].qual != NULL)
@@ -1920,14 +1934,15 @@ int main(int argc, char *argv[])
 			}
 
 			curr_parent = indexremove[rid];
-			if (curr_parent != -1) {
-				if (parents_buffer[curr_parent].length() == 0) {
-					parents_buffer[curr_parent].append(">" + string(seq[curr_parent].name) + ".\n" + string(seq[curr_parent].seq) + "\n");
+			if (curr_parent != -1)
+			{
+				if (parents_buffer[curr_parent].length() == 0)
+				{
+					parents_buffer[curr_parent].append(header_prefix + string(seq[curr_parent].name) + ".\n" + string(seq[curr_parent].seq) + "\n");
 				}
 
-				parents_buffer[curr_parent].append(">" + string(seq[rid].name) + "\n" + string(seq[rid].seq) + "\n");
+				parents_buffer[curr_parent].append(header_prefix + string(seq[rid].name) + "\n" + string(seq[rid].seq) + "\n");
 			}
-			
 		}
 		if (buf0.size() > 0)
 		{
@@ -1945,8 +1960,10 @@ int main(int argc, char *argv[])
 	// cout << "Time of saving file = " << stopwatch.stop() << std::endl;
 	// delete[] seq;
 
-	for (int rid = 0; rid < max_rid; rid++) {
-		if (parents_buffer[rid].length() > 0) {
+	for (int rid = 0; rid < max_rid; rid++)
+	{
+		if (parents_buffer[rid].length() > 0)
+		{
 			fprintf(pFileDups, "%s", parents_buffer[rid].c_str());
 		}
 	}
