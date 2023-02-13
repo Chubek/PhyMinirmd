@@ -21,12 +21,13 @@ int L;
 size_t max_rid;
 bseq1_t *seq, *seq1, *seq2;
 bool *isremove;
+int64_t *indexremove;
 int difthr = 0;
 bool isRC = false;
 bool isPE = false;
 bool iskf;
 int *avgQual;
-string rf1, rf2, rsf, kf;
+string rf1, rf2, rsf, kf, logpath;
 
 const size_t BUFFER_SIZE = 1ULL << 25;
 
@@ -95,6 +96,7 @@ inline void displayHelp(const char *prog)
 	printf("\t\t -i reads file\n");
 	printf("\t\t -f reads file, if paired end\n");
 	printf("\t\t -o the output file\n");
+	printf("\t\t -l the log file location\n");
 	printf("\t\t -d number of allowed mismatch\n");
 	printf("\t\t -k the file to store values of k\n");
 	printf("\t\t -r remove duplicates on reverse-complement strand\n");
@@ -111,7 +113,7 @@ inline void getPars(int argc, char *argv[])
 	bool is1 = false, is2 = false; // four
 	int oc;
 	iskf = false;
-	while ((oc = getopt(argc, argv, "i:f:o:t:d:k:hr")) >= 0)
+	while ((oc = getopt(argc, argv, "i:f:o:l:t:d:k:hr")) >= 0)
 	{
 		switch (oc)
 		{
@@ -140,6 +142,9 @@ inline void getPars(int argc, char *argv[])
 		case 'd':
 			difthr = atoi(optarg);
 			break;
+		case 'l':
+			logpath = optarg;
+			break;
 		case 'h':
 			displayHelp(argv[0]);
 			exit(0);
@@ -149,6 +154,7 @@ inline void getPars(int argc, char *argv[])
 			break;
 		}
 	}
+
 
 	if (!is1 || !is2)
 	{
@@ -190,6 +196,10 @@ inline void getPars(int argc, char *argv[])
 			exit(1);
 		}
 		f.close();
+	}
+	
+	if (logpath.length() == 0) {
+		logpath = "output.log";
 	}
 
 	/*std::ofstream fo;
@@ -944,10 +954,12 @@ void processClusterSEFun()
 								if (avgQual[aa] >= avgQual[bb])
 								{
 									isremove[bb] = true;
+									indexremove[bb] = aa;
 								}
 								else
 								{
 									isremove[aa] = true;
+									indexremove[aa] = bb;
 									// break;
 								}
 							}
@@ -990,10 +1002,12 @@ void processClusterSEFun()
 								if (avgQual[aa] >= avgQual[bb])
 								{
 									isremove[bb] = true;
+									indexremove[bb] = aa;
 								}
 								else
 								{
 									isremove[aa] = true;
+									indexremove[aa] = bb;
 									// break;
 								}
 							}
@@ -1053,10 +1067,12 @@ void processClusterPEFun()
 								if (avgQual[aa] >= avgQual[bb])
 								{
 									isremove[bb] = true;
+									indexremove[bb] = aa;
 								}
 								else
 								{
 									isremove[aa] = true;
+									indexremove[aa] = bb;
 									// break;
 								}
 							}
@@ -1103,10 +1119,12 @@ void processClusterPEFun()
 								if (avgQual[aa] >= avgQual[bb])
 								{
 									isremove[bb] = true;
+									indexremove[bb] = aa;
 								}
 								else
 								{
 									isremove[aa] = true;
+									indexremove[aa] = bb;
 									// break;
 								}
 							}
@@ -1746,6 +1764,8 @@ int main(int argc, char *argv[])
 	// scanf("%s", str);
 	isremove = new bool[max_rid];
 	memset(isremove, false, sizeof(bool) * max_rid);
+	indexremove = new int64_t[max_rid];
+	memset(indexremove, -1, sizeof(int64_t) * max_rid);
 	avgQual = new int[max_rid];
 	memset(avgQual, 0, sizeof(int) * max_rid);
 
@@ -1780,7 +1800,9 @@ int main(int argc, char *argv[])
 	delete[] kmervec;
 
 	FILE *pFileDups;
-	pFileDups = fopen("dups.fa", "w");
+	pFileDups = fopen(logpath.c_str(), "w");
+	int64_t curr_parent = -1;
+	std::string *parents_buffer = new std::string[max_rid];
 
 	// stopwatch.resume();
 
@@ -1816,10 +1838,16 @@ int main(int argc, char *argv[])
 					buf.clear();
 				}
 			}
-			else
-			{
-				fprintf(pFileDups, "%s\n%s\n", string(seq[rid].name).c_str(), string(seq[rid].seq).c_str());
+
+			curr_parent = indexremove[rid];
+			if (curr_parent != -1) {
+				if (parents_buffer[curr_parent].length() == 0) {
+					parents_buffer[curr_parent].append(">" + string(seq[curr_parent].name) + ".\n" + string(seq[curr_parent].seq) + "\n");
+				}
+
+				parents_buffer[curr_parent].append(">" + string(seq[rid].name) + "\n" + string(seq[rid].seq) + "\n");
 			}
+			
 		}
 		if (buf.size() > 0)
 		{
@@ -1876,10 +1904,16 @@ int main(int argc, char *argv[])
 					buf1.clear();
 				}
 			}
-			else
-			{
-				fprintf(pFileDups, "%s\n%s\n", string(seq[rid].name).c_str(), string(seq[rid].seq).c_str());
+
+			curr_parent = indexremove[rid];
+			if (curr_parent != -1) {
+				if (parents_buffer[curr_parent].length() == 0) {
+					parents_buffer[curr_parent].append(">" + string(seq[curr_parent].name) + ".\n" + string(seq[curr_parent].seq) + "\n");
+				}
+
+				parents_buffer[curr_parent].append(">" + string(seq[rid].name) + "\n" + string(seq[rid].seq) + "\n");
 			}
+			
 		}
 		if (buf0.size() > 0)
 		{
@@ -1896,6 +1930,13 @@ int main(int argc, char *argv[])
 	}
 	// cout << "Time of saving file = " << stopwatch.stop() << std::endl;
 	// delete[] seq;
+
+	for (int rid = 0; rid < max_rid; rid++) {
+		if (parents_buffer[rid].length() > 0) {
+			fprintf(pFileDups, "%s", parents_buffer[rid].c_str());
+		}
+	}
+
 	fclose(pFileDups);
 	return 0;
 }
