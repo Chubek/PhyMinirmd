@@ -1826,7 +1826,7 @@ int main(int argc, char *argv[])
 			{
 				// using a buffer to speed
 				// fprintf(fp, "%s\n%s\n", seq[rid].name, seq[rid].seq);
-				buf.append("@" + string(seq[rid].name) + "\n" + string(seq[rid].seq) + "\n");
+				buf.append(">" + string(seq[rid].name) + "\n" + string(seq[rid].seq) + "\n");
 				if (seq[rid].qual != NULL)
 				{
 					// fprintf(fp, "+\n%s\n", seq[rid].qual);
@@ -1880,8 +1880,8 @@ int main(int argc, char *argv[])
 			// kseq_destroy
 			if (!isremove[rid])
 			{
-				buf0.append("@" + string(seq1[rid].name) + "\n" + string(seq1[rid].seq) + "\n");
-				buf1.append("@" + string(seq2[rid].name) + "\n" + string(seq2[rid].seq) + "\n");
+				buf0.append(">" + string(seq1[rid].name) + "\n" + string(seq1[rid].seq) + "\n");
+				buf1.append(">" + string(seq2[rid].name) + "\n" + string(seq2[rid].seq) + "\n");
 				// fprintf(fp1, "%s\n%s\n", seq1[rid].name, seq1[rid].seq);
 				// fprintf(fp2, "%s\n%s\n", seq2[rid].name, seq2[rid].seq);
 				if (seq1[rid].qual != NULL)
