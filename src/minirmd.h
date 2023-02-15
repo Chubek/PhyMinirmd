@@ -58,5 +58,36 @@ extern unsigned char seq_nt4_table[256];
 // void mm_sketch_rc(const char *str, const int &len, const int &k, const uint32_t &rid, mm128_t *p);
 void radix_sort_128x(mm128_t *beg, mm128_t *end);
 
+# define ROTATE_RIGHT_16(x, d) x = (x >> d) | (x << (16 - d))
+
+# define REALLOC_DYNAMIC_MEM(ty, arr, new_size) 						\
+do { 																	\
+	void *nnptr = realloc(arr, new_size * sizeof(ty));					\
+																		\
+	if (!nnptr) {														\
+		cerr << "\033[1;31mError:\033[0m Reallocating dynamic memory";	\
+		exit(1);														\
+	}																	\
+																		\
+	arr = (ty)nnptr;													\
+																		\
+} while(0)
+
+
+typedef struct SizeClusterSolo {
+	bseq1_t **this_cluster;
+	uint16_t this_size;
+} size_cluster_t;
+
+
+typedef struct SizeClusterCollective {
+	size_cluster_t *clusters;
+	uint16_t no_clusters;
+} size_cluster_collective_t;
+
+# define SZ_CLST_S sizeof(size_cluster_t)
+# define SZ_CLST_C sizeof(size_cluster_collective_t)
+# define ROT_NUM 2
+
 
 #endif

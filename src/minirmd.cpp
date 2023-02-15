@@ -29,7 +29,11 @@ bool iskf;
 int *avgQual;
 string rf1, rf2, rsf, kf, logpath;
 string header_prefix;
+size_cluster_collective_t size_collective;
+size_t sizeof_size_cluster;
+
 const size_t BUFFER_SIZE = 1ULL << 25;
+
 
 // bool debug = false;
 // size_t did, rcdid;
@@ -1264,7 +1268,35 @@ inline void removeLongDuplicate() {
 	// cout << "--------------\n";
 }
 
-int maxStrlen()
+size_cluster_collective_t newSizeClusterCollective() {
+	return (size_cluster_collective_t) { .clusters = (size_cluster_t*)calloc(1, SZ_CLST_S), .no_clusters = 1 };
+}
+
+size_cluster_t newSizeClusterSolo() {
+	return (size_cluster_t) { .this_cluster  = NULL, .this_size = 0 };
+} 
+
+void resizeAndInsertIntoSizeClusterSolo(size_cluster_t *self, bseq1_t *new_seq) {
+	self->this_size += 1;
+
+	REALLOC_DYNAMIC_MEM(bseq1_t**, self->this_cluster, self->this_size);
+
+	self->this_cluster[self->this_size - 1] = new_seq;
+}
+
+void insertIntoClusterCollective(size_cluster_collective_t *self, bseq1_t *new_seq, uint16_t size_str) {
+	ROTATE_RIGHT_16(size_str, ROT_NUM);
+
+	if (size_str > self->no_clusters) {
+		self->no_clusters = size_str;
+
+		REALLOC_DYNAMIC_MEM(size_cluster_t*, self->clusters, self->no_clusters);
+	}
+
+	resizeAndInsertIntoSizeClusterSolo(&self->clusters[self->no_clusters - 1], new_seq);
+}
+
+int maxStrlenAndClusterBySize()
 {
 	int supposed_max = 0;
 	int curr_len = 0;
@@ -1276,6 +1308,8 @@ int maxStrlen()
 		{
 			supposed_max = curr_len;
 		}
+
+		insertIntoClusterCollective(&size_collective, &seq1[rid], curr_len);
 	}
 
 	return supposed_max;
@@ -1302,7 +1336,9 @@ int main(int argc, char* argv[]) {
 			return 0;
 		}
 	}
-	L = maxStrlen();
+	sizeof_size_cluster = 1;
+	size_collective = newSizeClusterCollective();
+	L = maxStrlenAndClusterBySize();
 	if (iskf) {
 		kmervecsize = 0;
 		kmervec = new int[32];
