@@ -69,20 +69,22 @@ do { 																	\
 		exit(1);														\
 	}																	\
 																		\
-	arr = (ty)nnptr;													\
+	arr = (ty*)nnptr;													\
 																		\
 } while(0)
 
 
 typedef struct SizeClusterSolo {
-	bseq1_t **this_cluster;
+	bseq1_t *this_cluster;
 	uint16_t this_size;
+	uint8_t set_one;
 } size_cluster_t;
 
 
 typedef struct SizeClusterCollective {
 	size_cluster_t *clusters;
 	uint16_t no_clusters;
+	uint16_t curr_index;
 } size_cluster_collective_t;
 
 # define SZ_CLST_S sizeof(size_cluster_t)

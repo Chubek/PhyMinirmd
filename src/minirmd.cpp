@@ -187,13 +187,7 @@ inline void getPars(int argc, char* argv[]) {
 		f.close();
 	}
 
-    if (logpath.length() == 0)
-	{
-		logpath = "output.log";
-	}
-
 	header_prefix = ">";
-
 	if (rsf.find(".fq") != -1 || rsf.find("fastaq") != -1 || rsf.find("fastq") != -1)
 	{
 		header_prefix = "@";
@@ -1168,132 +1162,49 @@ inline void processLargeCluster() {
 	}
 }
 
-inline void removeDuplicate() {
-	// CStopWatch rdt;
-	// rdt.start();
-
-	// stopwatch.resume();
-	seq = seq1;
-
-	// cout << seq1[0].seq << endl;
-	// cout << seq2[0].seq << endl;
-	// if (isPE && (kmer^1)) {
-	// 	seq = seq2;
-	// }
-	calcMinimizers();
-	// cout << "after calcMinimizers()\n";
-	// cout << "Time of calcMinimizers() = " << stopwatch.stop() << std::endl;
-	// stopwatch.resume();
-	// exit(0);
-
-	for (int kmervecidx = 0; kmervecidx < kmervecsize; ++kmervecidx) {
-		if (kmervecidx > 0 && kmervec[kmervecidx - 1] == kmervec[kmervecidx])
-			continue;
-
-		for (int i = 0; i < (1 << bsize); ++i) {
-			kv_init(B[i]);
-		}
-		if (isPE) {
-			if (kmervecidx&1) {
-				seq = seq2;
-			} else {
-				seq = seq1;
-			}
-		}
-		sortBuckets(kmervecidx);
-		// cout << "Time of sortBuckets() = " << stopwatch.stop() << std::endl;
-		// stopwatch.resume();
-		
-		processCluster();
-
-		processLargeCluster();
-		kv_destroy(sgv);
-		// kv_destroy(lsgv);
-
-		for (int i = 0; i < (1 << bsize); ++i) {
-			kv_destroy(B[i]);
-		}
-		// cout << "Time of processBuckets() = " << stopwatch.stop() << std::endl;
-		// stopwatch.resume();
-	}
-
-	// cout << "Time of removeDuplicate() = " << rdt.stop() << std::endl;
-	// cout << "--------------\n";
-}
-
-inline void removeLongDuplicate() {
-	// CStopWatch rdt;
-	// rdt.start();
-
-	// stopwatch.resume();
-	seq = seq1;
-
-	calcLongMinimizers();
-	// cout << "Time of calcLongMinimizers() = " << stopwatch.stop() << std::endl;
-	// stopwatch.resume();
-	// exit(0);
-
-	for (int kmervecidx = 0; kmervecidx < lkmervecsize; ++ kmervecidx) {
-		if (kmervecidx > 0 && lkmervec[kmervecidx - 1] == lkmervec[kmervecidx])
-			continue;
-
-		// cout << "kmer: " << lkmervec[kmervecidx] << endl;
-
-		for (int i = 0; i < (1 << bsize); ++i) {
-			kv_init(BL[i]);
-		}
-		
-		sortLongBuckets(kmervecidx);
-		// cout << "Time of sortLongBuckets() = " << stopwatch.stop() << std::endl;
-		// stopwatch.resume();
-		
-		// cout << "before processCluster\n";
-		processCluster();
-
-		// cout << "before processLargeCluster\n";
-		processLargeCluster();
-		// cout << "before kv_destroy(sgv)\n";
-		kv_destroy(sgv);
-		// kv_destroy(lsgv);
-
-		// cout << "before kv_destroy(BL[i]);\n";
-		for (int i = 0; i < (1 << bsize); ++i) {
-			kv_destroy(BL[i]);
-		}
-		// cout << "Time of processBuckets() = " << stopwatch.stop() << std::endl;
-		// stopwatch.resume();
-	}
-	// cout << "over removeLongDuplicate()\n";
-	// cout << "Time of removeLongDuplicate() = " << rdt.stop() << std::endl;
-	// cout << "--------------\n";
-}
 
 size_cluster_collective_t newSizeClusterCollective() {
-	return (size_cluster_collective_t) { .clusters = (size_cluster_t*)calloc(1, SZ_CLST_S), .no_clusters = 1 };
+	return (size_cluster_collective_t) { .clusters = (size_cluster_t*)calloc(1, SZ_CLST_S), .no_clusters = 1, .curr_index = 0 };
 }
 
 size_cluster_t newSizeClusterSolo() {
-	return (size_cluster_t) { .this_cluster  = NULL, .this_size = 0 };
+	return (size_cluster_t) { .this_cluster  = NULL, .this_size = 0, .set_one = 1 };
 } 
 
-void resizeAndInsertIntoSizeClusterSolo(size_cluster_t *self, bseq1_t *new_seq) {
+void resizeAndInsertIntoSizeClusterSolo(size_cluster_t *self, bseq1_t new_seq) {
 	self->this_size += 1;
 
-	REALLOC_DYNAMIC_MEM(bseq1_t**, self->this_cluster, self->this_size);
+	REALLOC_DYNAMIC_MEM(bseq1_t, self->this_cluster, self->this_size);
 
 	self->this_cluster[self->this_size - 1] = new_seq;
 }
 
-void insertIntoClusterCollective(size_cluster_collective_t *self, bseq1_t *new_seq, uint16_t size_str) {
+void insertIntoClusterCollective(size_cluster_collective_t *self, bseq1_t new_seq, uint16_t size_str) {
 	ROTATE_RIGHT_16(size_str, ROT_NUM);
 
 	if (size_str > self->no_clusters) {
 		self->no_clusters = size_str;
 
-		REALLOC_DYNAMIC_MEM(size_cluster_t*, self->clusters, self->no_clusters);
+		REALLOC_DYNAMIC_MEM(size_cluster_t, self->clusters, self->no_clusters);
+	
+		self->clusters[self->no_clusters - 1] = newSizeClusterSolo();
 	}
 
 	resizeAndInsertIntoSizeClusterSolo(&self->clusters[self->no_clusters - 1], new_seq);
+}
+
+bseq1_t* getNextSeqArr(size_cluster_collective_t *self) {
+	size_cluster_t curr_solo;
+
+	for (size_t i = self->curr_index; i < self->no_clusters; i++) {
+		curr_solo = self->clusters[i];
+		if (curr_solo.set_one) {
+			self->curr_index = i + 1;
+			return curr_solo.this_cluster;
+		}
+	}
+
+	return NULL;
 }
 
 int maxStrlenAndClusterBySize()
@@ -1309,10 +1220,116 @@ int maxStrlenAndClusterBySize()
 			supposed_max = curr_len;
 		}
 
-		insertIntoClusterCollective(&size_collective, &seq1[rid], curr_len);
+		insertIntoClusterCollective(&size_collective, seq1[rid], curr_len);
 	}
 
 	return supposed_max;
+}
+
+
+inline void removeDuplicate() {
+	// CStopWatch rdt;
+	// rdt.start();
+
+	// stopwatch.resume();
+
+	while (seq = getNextSeqArr(&size_collective)) {
+		seq = seq1;
+
+		// cout << seq1[0].seq << endl;
+		// cout << seq2[0].seq << endl;
+		// if (isPE && (kmer^1)) {
+		// 	seq = seq2;
+		// }
+		calcMinimizers();
+		// cout << "after calcMinimizers()\n";
+		// cout << "Time of calcMinimizers() = " << stopwatch.stop() << std::endl;
+		// stopwatch.resume();
+		// exit(0);
+
+		for (int kmervecidx = 0; kmervecidx < kmervecsize; ++kmervecidx) {
+			if (kmervecidx > 0 && kmervec[kmervecidx - 1] == kmervec[kmervecidx])
+				continue;
+
+			for (int i = 0; i < (1 << bsize); ++i) {
+				kv_init(B[i]);
+			}
+			if (isPE) {
+				if (kmervecidx&1) {
+					seq = seq2;
+				} else {
+					seq = seq1;
+				}
+			}
+			sortBuckets(kmervecidx);
+			// cout << "Time of sortBuckets() = " << stopwatch.stop() << std::endl;
+			// stopwatch.resume();
+			
+			processCluster();
+
+			processLargeCluster();
+			kv_destroy(sgv);
+			// kv_destroy(lsgv);
+
+			for (int i = 0; i < (1 << bsize); ++i) {
+				kv_destroy(B[i]);
+			}
+			// cout << "Time of processBuckets() = " << stopwatch.stop() << std::endl;
+			// stopwatch.resume();
+		}
+	}
+
+	// cout << "Time of removeDuplicate() = " << rdt.stop() << std::endl;
+	// cout << "--------------\n";
+}
+
+inline void removeLongDuplicate() {
+	// CStopWatch rdt;
+	// rdt.start();
+
+	// stopwatch.resume();
+	while (seq = getNextSeqArr(&size_collective)) {
+		seq = seq1;
+
+		calcLongMinimizers();
+		// cout << "Time of calcLongMinimizers() = " << stopwatch.stop() << std::endl;
+		// stopwatch.resume();
+		// exit(0);
+
+		for (int kmervecidx = 0; kmervecidx < lkmervecsize; ++ kmervecidx) {
+			if (kmervecidx > 0 && lkmervec[kmervecidx - 1] == lkmervec[kmervecidx])
+				continue;
+
+			// cout << "kmer: " << lkmervec[kmervecidx] << endl;
+
+			for (int i = 0; i < (1 << bsize); ++i) {
+				kv_init(BL[i]);
+			}
+			
+			sortLongBuckets(kmervecidx);
+			// cout << "Time of sortLongBuckets() = " << stopwatch.stop() << std::endl;
+			// stopwatch.resume();
+			
+			// cout << "before processCluster\n";
+			processCluster();
+
+			// cout << "before processLargeCluster\n";
+			processLargeCluster();
+			// cout << "before kv_destroy(sgv)\n";
+			kv_destroy(sgv);
+			// kv_destroy(lsgv);
+
+			// cout << "before kv_destroy(BL[i]);\n";
+			for (int i = 0; i < (1 << bsize); ++i) {
+				kv_destroy(BL[i]);
+			}
+			// cout << "Time of processBuckets() = " << stopwatch.stop() << std::endl;
+			// stopwatch.resume();
+		}
+	}
+	// cout << "over removeLongDuplicate()\n";
+	// cout << "Time of removeLongDuplicate() = " << rdt.stop() << std::endl;
+	// cout << "--------------\n";
 }
 
 
@@ -1679,18 +1696,22 @@ int main(int argc, char* argv[]) {
 	// cout << "Time of saving file = " << stopwatch.stop() << std::endl;
 	// delete[] seq;
 
-	FILE *pFileDups;
-	pFileDups = fopen(logpath.c_str(), "w");		
+	if (logpath.length() > 0) {
+		FILE *file_dups;
+		file_dups = fopen(logpath.c_str(), "w");		
 
-    for (int rid = 0; rid < max_rid; rid++)
-	{
-		if (parents_buffer[rid].length() > 0)
+		for (int rid = 0; rid < max_rid; rid++)
 		{
-			fprintf(pFileDups, "%s", parents_buffer[rid].c_str());
+			if (parents_buffer[rid].length() > 0)
+			{
+				fprintf(file_dups, "%s", parents_buffer[rid].c_str());
+			}
 		}
+
+		fclose(file_dups);
 	}
 
-	fclose(pFileDups);
+	
 
 	return 0;
 }
