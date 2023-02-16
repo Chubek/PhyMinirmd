@@ -183,12 +183,7 @@ inline void getPars(int argc, char* argv[]) {
 		f.close();
 	}
 
-    if (logpath.length() == 0)
-	{
-		logpath = "output.log";
-	}
-
-	header_prefix = ">";
+  	header_prefix = ">";
 
 	if (rsf.find(".fq") != -1 || rsf.find("fastaq") != -1 || rsf.find("fastq") != -1)
 	{
@@ -1295,6 +1290,10 @@ int main(int argc, char* argv[]) {
 		return 0;
 	}
 
+	if (max_rid < 5) {
+		bsize = 1;
+	}
+
 	if (isPE) {
 		rb = getReads2(rf2.c_str());
 		if (!rb) {
@@ -1643,18 +1642,22 @@ int main(int argc, char* argv[]) {
 	// cout << "Time of saving file = " << stopwatch.stop() << std::endl;
 	// delete[] seq;
 
-	FILE *pFileDups;
-	pFileDups = fopen(logpath.c_str(), "w");		
+	if (logpath.length() > 0) {
+		FILE *pFileDups;
+		pFileDups = fopen(logpath.c_str(), "w");		
 
-    for (int rid = 0; rid < max_rid; rid++)
-	{
-		if (parents_buffer[rid].length() > 0)
+		for (int rid = 0; rid < max_rid; rid++)
 		{
-			fprintf(pFileDups, "%s", parents_buffer[rid].c_str());
+			if (parents_buffer[rid].length() > 0)
+			{
+				fprintf(pFileDups, "%s", parents_buffer[rid].c_str());
+			}
 		}
+
+		fclose(pFileDups);
 	}
 
-	fclose(pFileDups);
+	
 
 	return 0;
 }
